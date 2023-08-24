@@ -1,0 +1,48 @@
+---
+- name: 'Delete user and pubkey'
+  hosts: 'cisco_ios'
+  gather_facts: false
+  tasks:
+    - name: 'Import role: get_pubkey_userlist'
+      ansible.builtin.import_role:
+        name: 'get_pubkey_userlist'
+
+    - name: 'Check username list'
+      ansible.builtin.assert:
+        that: 'res_users.ansible_facts.usernames | length > 0'
+        fail_msg: "Pubkey-user is no setting (without {{ ansible_user }})"
+
+    - name: 'Display pubkey user list'
+      ansible.builtin.debug:
+        msg:
+          pubkey_chain_users: "{{ res_users.ansible_facts.usernames }}"
+
+    - name: 'Input username'
+      ansible.builtin.pause:
+        prompt: 'Enter the user name to be deleted'
+      when: 'inventory_hostname == main_router'
+      register: res_input_username
+
+    - name: 'Check username list'
+      ansible.builtin.assert:
+        that: 'hostvars[main_router].res_input_username.user_input in res_users.ansible_facts.usernames'
+        fail_msg: "Canceled"
+
+    - name: 'Delete ssh pubkey-chain on {{ hostvars[main_router].res_input_username.user_input }}'
+      cisco.ios.ios_config:
+        parents:
+          - 'ip ssh pubkey-chain'
+        lines:
+          - 'no username {{ hostvars[main_router].res_input_username.user_input }}'
+
+    - name: 'Delete users'
+      cisco.ios.ios_user:
+        name: "{{ hostvars[main_router].res_input_username.user_input }}"
+        privilege: 15
+        state: 'absent'
+      register: res_delete_user
+
+    - name: 'Exec write memory'
+      cisco.ios.ios_config:
+        save_when: always
+...

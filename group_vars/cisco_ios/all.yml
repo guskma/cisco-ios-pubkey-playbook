@@ -1,0 +1,5 @@
+---
+ansible_connection: 'network_cli'
+ansible_network_os: 'ios'
+ansible_ssh_private_key_file: '~/.ssh/id_rsa'
+ansible_ssh_common_args: 'KexAlgorithms=diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1 HostkeyAlgorithms=ssh-rsa PubkeyAcceptedKeyTypes=ssh-rsa FingerprintHash=md5'

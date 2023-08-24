@@ -1,0 +1,60 @@
+---
+- name: Modify ssh-pubkey
+  hosts: cisco_ios
+  gather_facts: false
+  tasks:
+    - name: 'Import role: get_pubkey_userlist'
+      ansible.builtin.import_role:
+        name: 'get_pubkey_userlist'
+
+    - name: 'Input username'
+      ansible.builtin.pause:
+        prompt: 'Enter new user name'
+      when: 'inventory_hostname == main_router'
+      register: res_input_username
+
+    - name: 'Check username inputs'
+      ansible.builtin.assert:
+        that: 'hostvars[main_router].res_input_username.user_input | length > 0'
+        fail_msg: "Canceled"
+
+    - name: 'Confirm block'
+      when: 'hostvars[main_router].res_input_username.user_input in res_users.ansible_facts.usernames'
+      block:
+        - name: 'Confirm if you want to continue'
+          ansible.builtin.pause:
+            prompt: 'The user "{{ hostvars[main_router].res_input_username.user_input }}" exists. overwrite? (y|N)'
+          register: res_input_overwrite
+
+        - name: 'Check overwrite'
+          ansible.builtin.assert:
+            that: 'hostvars[main_router].res_input_overwrite.user_input == "y"'
+            fail_msg: "Canceled"
+
+    - name: 'Generate ssh key'
+      community.crypto.openssh_keypair:
+        path: "{{ hostvars[main_router].res_input_username.user_input }}_id_rsa"
+        type: 'rsa'
+        size: 3072
+        state: 'present'
+        comment: 'GeneratedByAnsible'
+        force: true
+
+    - name: 'Load id_rsa.pub file'
+      ansible.builtin.slurp:
+        src: '{{ hostvars[main_router].res_input_username.user_input }}_id_rsa.pub'
+      register: res_ssh_key
+
+    - name: Add users
+      no_log: true
+      cisco.ios.ios_user:
+        name: "{{ hostvars[main_router].res_input_username.user_input }}"
+        privilege: 15
+        sshkey: "{{ res_ssh_key.content | b64decode }}"
+        state: 'present'
+      register: res_add_user
+
+    - name: 'Exec write memory'
+      cisco.ios.ios_config:
+        save_when: always
+...

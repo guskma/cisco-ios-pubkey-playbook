@@ -1,0 +1,13 @@
+- name: 'Get pubkey-chain config'
+  cisco.ios.ios_command:
+    commands:
+      - 'show running-config | section ip ssh pubkey-chain'
+  changed_when: false
+  register: 'res_user_list'
+
+- name: 'Set pubkey users variable'
+  vars:
+    pubkey_user_lines: "{{ res_user_list.stdout_lines[0] | select('search', 'username') | reject('search', ansible_user) }}"
+  ansible.builtin.set_fact:
+    usernames: "{{ pubkey_user_lines | map('regex_replace', '^\\s+username (\\S+).*$', '\\1') }}"
+  register: res_users
